@@ -69,25 +69,35 @@ export function ChatRoom() {
   }
 
   return (
-    <Container size="3" p="4">
-      <Flex direction="column" gap="4" style={{ height: "100vh" }}>
+    <Container size="3" p="4" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+      <Flex 
+        direction="column" 
+        gap="4" 
+        style={{ 
+          height: "calc(100vh - 80px)",
+          maxHeight: "800px",
+          minHeight: "500px"
+        }}
+      >
         {/* 標題和用戶資料 */}
-        <Flex justify="between" align="center">
+        <Flex justify="between" align="center" style={{ flexShrink: 0 }}>
           <Heading size="6">聊天室</Heading>
           <UserProfile onProfileUpdate={() => refetch()} />
         </Flex>
 
         {/* 訊息列表 */}
-        <Box style={{ flex: 1, overflow: "hidden" }}>
+        <Box style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
           <MessageList messages={messages} currentUser={account.address} />
         </Box>
 
         {/* 發送訊息 */}
-        <SendMessage
-          onMessageSent={() => {
-            refetch();
-          }}
-        />
+        <Box style={{ flexShrink: 0 }}>
+          <SendMessage
+            onMessageSent={() => {
+              refetch();
+            }}
+          />
+        </Box>
       </Flex>
     </Container>
   );

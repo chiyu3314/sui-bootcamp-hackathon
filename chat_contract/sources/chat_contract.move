@@ -91,7 +91,7 @@ module chat_contract::chat_contract {
     ) {
         let sender = tx_context::sender(ctx);
 
-        // 使用自定義錯誤碼，而不是魔法數字
+        // 確保只有 profile 擁有者可以更改
         assert!(sender == profile.owner, E_NOT_OWNER);
 
         profile.username = new_username;

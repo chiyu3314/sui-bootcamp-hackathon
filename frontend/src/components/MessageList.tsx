@@ -1,6 +1,5 @@
 import { Box, Text, Flex, Avatar } from "@radix-ui/themes";
 import { formatDistanceToNow } from "date-fns";
-import { zhTW } from "date-fns/locale";
 import { useEffect, useRef } from "react";
 
 interface Message {
@@ -38,7 +37,7 @@ export function MessageList({
 
   // 格式化顯示名稱（可在這裡修改字樣）
   const formatDisplayName = (address: string) => {
-    if (address === currentUser) return "你";
+    if (address === currentUser) return "You";
     const profile = userProfiles[address];
     if (profile?.username) return profile.username;
     return `${address.slice(0, 8)}...${address.slice(-6)}`;
@@ -196,7 +195,6 @@ export function MessageList({
                         <Text size="1" style={{ opacity: 0.7 }}>
                           {formatDistanceToNow(messageDate, {
                             addSuffix: true,
-                            locale: zhTW,
                           })}
                         </Text>
                         {isOwnMessage && (

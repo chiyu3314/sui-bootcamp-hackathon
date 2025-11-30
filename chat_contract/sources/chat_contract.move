@@ -97,7 +97,7 @@ module chat_app::chat_contract {
     }
 
     // 注意：這裡移除了 'entry' 關鍵字
-    // 發送訊息時自動將之前所有未讀訊息標記為已讀
+    // 發送訊息（已移除自動標記邏輯以降低 gas 成本）
     public fun send_message(
         room: &mut ChatRoom, 
         text: String, 
@@ -106,25 +106,6 @@ module chat_app::chat_contract {
     ) {
         let sender = tx_context::sender(ctx);
         let timestamp = clock::timestamp_ms(clock);
-
-        // 在發送新訊息前，將之前所有未讀訊息標記為已讀
-        let messages_len = vector::length(&room.messages);
-        let mut i = 0;
-        while (i < messages_len) {
-            let msg = vector::borrow_mut(&mut room.messages, i);
-            // 檢查使用者是否已經標記過，且不是自己發送的訊息
-            let already_read = vector::contains(&msg.read_by, &sender);
-            if (!already_read && msg.sender != sender) {
-                vector::push_back(&mut msg.read_by, sender);
-                // 發送已讀事件
-                event::emit(MessageRead {
-                    message_index: i,
-                    reader: sender,
-                    timestamp: timestamp
-                });
-            };
-            i = i + 1;
-        };
 
         let msg = Message {
             sender: sender,
@@ -172,5 +153,33 @@ module chat_app::chat_contract {
                 timestamp: clock::timestamp_ms(clock)
             });
         }
+    }
+
+    // 批量標記所有未讀訊息為已讀（當用戶看到最後一個訊息時調用）
+    public fun mark_all_messages_as_read(
+        room: &mut ChatRoom,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let reader = tx_context::sender(ctx);
+        let messages_len = vector::length(&room.messages);
+        let timestamp = clock::timestamp_ms(clock);
+        let mut i = 0;
+        
+        while (i < messages_len) {
+            let msg = vector::borrow_mut(&mut room.messages, i);
+            // 檢查使用者是否已經標記過，且不是自己發送的訊息
+            let already_read = vector::contains(&msg.read_by, &reader);
+            if (!already_read && msg.sender != reader) {
+                vector::push_back(&mut msg.read_by, reader);
+                // 發送已讀事件
+                event::emit(MessageRead {
+                    message_index: i,
+                    reader: reader,
+                    timestamp: timestamp
+                });
+            };
+            i = i + 1;
+        };
     }
 }

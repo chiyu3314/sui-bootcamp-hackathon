@@ -1,8 +1,9 @@
 import { ConnectButton } from "@mysten/dapp-kit";
 import { Box, Flex, Heading } from "@radix-ui/themes";
 import { ChatRoom } from "./components/ChatRoom";
-
-function App() {
+import { CHAT_ROOM_OBJECT_ID } from "./config";
+  
+export function App() {
   return (
     <>
       <Flex
@@ -24,7 +25,7 @@ function App() {
           <ConnectButton />
         </Box>
       </Flex>
-      <ChatRoom />
+      <ChatRoom roomId={CHAT_ROOM_OBJECT_ID} roomName="主聊天室" />
     </>
   );
 }

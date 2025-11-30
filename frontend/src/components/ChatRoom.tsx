@@ -3,10 +3,11 @@ import { Box, Container, Flex, Heading, Text, Card } from "@radix-ui/themes";
 import { MessageList } from "./MessageList";
 import { SendMessage } from "./SendMessage";
 import { UserProfile } from "./UserProfile";
-import { CHAT_CONTRACT_PACKAGE_ID } from "../config"; // 只剩這個用 env
+import { CHAT_CONTRACT_PACKAGE_ID } from "../config";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Transaction } from "@mysten/sui/transactions";
 import { useSubscribeToEvents } from "../hooks/useSubscribeToEvents";
+import { useZKLogin } from "react-sui-zk-login-kit";
 
 interface Message {
   sender: string;
@@ -23,22 +24,27 @@ interface UserProfileMap {
   };
 }
 
-// ⭐ 新增：ChatRoom 的 props 型別
 interface ChatRoomProps {
-  roomId: string;     // Sui 上這個聊天室的 object ID
-  roomName: string;   // 顯示用名稱
+  roomId: string;
+  roomName: string;
 }
 
-// ⭐ 改：讓 ChatRoom 接 props
 export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
-  const account = useCurrentAccount();
+  // ✅ 取得錢包帳號
+  const walletAccount = useCurrentAccount();
+  
+  // ✅ 取得 Google zkLogin 帳號
+  const { address: zkAddress } = useZKLogin();
+  
+  // ✅ 優先使用 zkLogin 地址，其次使用錢包地址
+  const account = walletAccount || (zkAddress ? { address: zkAddress } : null);
+  
   const client = useSuiClient();
   const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [messages, setMessages] = useState<Message[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
   const [hasMarkedAllRead, setHasMarkedAllRead] = useState(false);
 
-  // 讀取指定 roomId 的 ChatRoom 對象（⭐這裡改 id）
   const { data: chatRoomData, refetch } = useSuiClientQuery(
     "getObject",
     {
@@ -50,11 +56,9 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     },
     {
       enabled: !!roomId && roomId !== "0x0",
-      // 移除輪詢，改用事件監聽
     }
   );
 
-  // 訂閱智能合約事件，當有新訊息或已讀狀態變更時自動更新
   useSubscribeToEvents({
     client,
     onEvent: useCallback(() => {
@@ -75,11 +79,10 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
             text: msg.fields?.text || msg.text || "",
             timestamp: Number(msg.fields?.timestamp || msg.timestamp || 0),
             readBy: readBy,
-            id: `msg_${index}`, // 添加 id 用於追蹤
+            id: `msg_${index}`,
           };
         });
         setMessages(parsedMessages);
-        // 當有新訊息時，重置標記狀態
         setHasMarkedAllRead(false);
       } else {
         setMessages([]);
@@ -89,7 +92,6 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     }
   }, [chatRoomData]);
 
-  // 將 readBy 轉換為 readStats 格式
   const readStats = useMemo(() => {
     const stats: { [messageId: string]: Set<string> } = {};
     messages.forEach((msg, index) => {
@@ -99,7 +101,6 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     return stats;
   }, [messages]);
 
-  // 查詢所有發送者的 Profile（這段保留）
   useEffect(() => {
     const fetchUserProfiles = async () => {
       if (!messages.length || CHAT_CONTRACT_PACKAGE_ID === "0x0") {
@@ -162,13 +163,11 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     fetchUserProfiles();
   }, [messages, client]);
 
-  // 批量標記所有未讀訊息為已讀（當最後一個訊息出現時調用）
   const markAllMessagesAsRead = useCallback(() => {
     if (!account || !roomId || roomId === "0x0" || hasMarkedAllRead) {
       return;
     }
 
-    // 檢查是否有未讀訊息（不是自己發送的）
     const hasUnreadMessages = messages.some(
       (msg) => msg.sender !== account.address && !msg.readBy.includes(account.address)
     );
@@ -216,25 +215,21 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     );
   }, [account, roomId, messages, hasMarkedAllRead, signAndExecute, refetch]);
 
-  // 單個訊息標記為已讀（用於 IntersectionObserver）
   const handleMarkAsRead = useCallback((messageId: string) => {
-    // 這裡可以實現單個訊息的標記，但我們主要使用批量標記
-    // 如果需要單個標記，可以在這裡實現
     console.log("標記訊息為已讀:", messageId);
   }, []);
 
-  // 沒連錢包
+  // ✅ 檢查是否已登入（Google zkLogin 或錢包）
   if (!account) {
     return (
       <Container>
         <Card style={{ padding: "1rem" }}>
-          <Text>請先連接錢包以使用聊天室</Text>
+          <Text>請先連接錢包或使用 Google 登入以使用聊天室</Text>
         </Card>
       </Container>
     );
   }
 
-  // ⭐ roomId 為空或 0x0 的狀況
   if (!roomId || roomId === "0x0") {
     return (
       <Container size="1" p="1" style={{ maxWidth: "600px", margin: "0 auto" }}>
@@ -247,7 +242,6 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
       </Container>
     );
   }
-
 
   console.log(messages, account);
 
@@ -262,13 +256,11 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
           minHeight: "500px",
         }}
       >
-        {/* ⭐ 標題用 roomName */}
         <Flex justify="between" align="center" style={{ flexShrink: 0 }}>
           <Heading size="6">{roomName}</Heading>
           <UserProfile onProfileUpdate={() => refetch()} />
         </Flex>
 
-        {/* 訊息列表 */}
         <Box style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
           <MessageList
             messages={messages.map((msg, index) => ({
@@ -283,7 +275,6 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
           />
         </Box>
 
-        {/* 發送訊息 */}
         <Box style={{ flexShrink: 0 }}>
           <SendMessage
             onMessageSent={() => {

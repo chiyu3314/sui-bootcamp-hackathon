@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { useCurrentAccount, useSuiClientQuery, useSuiClient } from "@mysten/dapp-kit";
 import { Box, Container, Flex, Heading, Text, Card } from "@radix-ui/themes";
 import { MessageList } from "./MessageList";
@@ -195,3 +196,43 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     </Container>
   );
 }
+=======
+import React from 'react';
+
+export function ChatRoom() {
+  return (
+    <div style={{ maxWidth: '800px', margin: '20px auto', padding: '0 16px' }}>
+      <div style={{ 
+        minHeight: '300px', 
+        padding: '30px', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '12px', 
+        backgroundColor: 'white',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>💬</div>
+        <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', color: '#111827' }}>
+          歡迎來到聊天室
+        </h2>
+        <p style={{ color: '#6b7280', margin: '0 0 24px 0', fontSize: '16px' }}>
+          這裡將會顯示即時的區塊鏈訊息...
+        </p>
+        <div style={{ 
+          padding: '12px 20px', 
+          backgroundColor: '#eff6ff', 
+          borderRadius: '8px', 
+          color: '#1d4ed8',
+          fontSize: '14px' 
+        }}>
+          💡 提示：請先使用上方的按鈕連接錢包或登入 Google
+        </div>
+      </div>
+    </div>
+  );
+}
+>>>>>>> Stashed changes

@@ -3,14 +3,14 @@ import { createNetworkConfig } from "@mysten/dapp-kit";
 
 const { networkConfig, useNetworkVariable, useNetworkVariables } =
   createNetworkConfig({
-    devnet: {
-      url: getFullnodeUrl("devnet"),
-    },
-    testnet: {
-      url: getFullnodeUrl("testnet"),
+    localnet: {
+      url: getFullnodeUrl("localnet"),
     },
     mainnet: {
       url: getFullnodeUrl("mainnet"),
+    },
+    testnet: {
+      url: getFullnodeUrl("testnet"),
     },
   });
 

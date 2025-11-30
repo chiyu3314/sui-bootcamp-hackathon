@@ -13,7 +13,7 @@ type Room = {
   name: string;
 };
 
-const GOOGLE_CLIENT_ID = "73850711498-hk92uj0bn8ve6or94ktksgnupas877t4.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "14283753215-f1aj98bkgp8mik0vs6o2an0d7sv2c3bj.apps.googleusercontent.com";
 const FULLNODE_URL = getFullnodeUrl("testnet");
 const suiClient = new SuiClient({ url: FULLNODE_URL });
 const SUI_PROVER_ENDPOINT = "https://prover-dev.mystenlabs.com/v1";

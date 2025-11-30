@@ -1,16 +1,19 @@
-import { useCurrentAccount, useSuiClientQuery, useSuiClient } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClientQuery, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Box, Container, Flex, Heading, Text, Card } from "@radix-ui/themes";
 import { MessageList } from "./MessageList";
 import { SendMessage } from "./SendMessage";
 import { UserProfile } from "./UserProfile";
 import { CHAT_CONTRACT_PACKAGE_ID } from "../config"; // 只剩這個用 env
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Transaction } from "@mysten/sui/transactions";
+import { useSubscribeToEvents } from "../hooks/useSubscribeToEvents";
 
 interface Message {
   sender: string;
   text: string;
   timestamp: number;
   readBy: string[];
+  id?: string;
 }
 
 interface UserProfileMap {
@@ -30,8 +33,10 @@ interface ChatRoomProps {
 export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
   const account = useCurrentAccount();
   const client = useSuiClient();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [messages, setMessages] = useState<Message[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
+  const [hasMarkedAllRead, setHasMarkedAllRead] = useState(false);
 
   // 讀取指定 roomId 的 ChatRoom 對象（⭐這裡改 id）
   const { data: chatRoomData, refetch } = useSuiClientQuery(
@@ -45,9 +50,19 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     },
     {
       enabled: !!roomId && roomId !== "0x0",
-      refetchInterval: 3000,
+      // 移除輪詢，改用事件監聽
     }
   );
+
+  // 訂閱智能合約事件，當有新訊息或已讀狀態變更時自動更新
+  useSubscribeToEvents({
+    client,
+    onEvent: useCallback(() => {
+      console.log("收到區塊鏈事件，重新獲取數據");
+      refetch();
+    }, [refetch]),
+    enabled: !!roomId && roomId !== "0x0",
+  });
 
   useEffect(() => {
     if (chatRoomData?.data?.content && "fields" in chatRoomData.data.content) {
@@ -55,16 +70,17 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
       if (fields.messages && Array.isArray(fields.messages)) {
         const parsedMessages: Message[] = fields.messages.map((msg: any, index: number) => {
           const readBy = msg.fields?.read_by || msg.read_by || [];
-          console.log(`訊息 ${index} 的 read_by:`, readBy);
           return {
             sender: msg.fields?.sender || msg.sender || "",
             text: msg.fields?.text || msg.text || "",
             timestamp: Number(msg.fields?.timestamp || msg.timestamp || 0),
             readBy: readBy,
+            id: `msg_${index}`, // 添加 id 用於追蹤
           };
         });
-        console.log("解析後的訊息:", parsedMessages);
         setMessages(parsedMessages);
+        // 當有新訊息時，重置標記狀態
+        setHasMarkedAllRead(false);
       } else {
         setMessages([]);
       }
@@ -72,6 +88,16 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
       setMessages([]);
     }
   }, [chatRoomData]);
+
+  // 將 readBy 轉換為 readStats 格式
+  const readStats = useMemo(() => {
+    const stats: { [messageId: string]: Set<string> } = {};
+    messages.forEach((msg, index) => {
+      const msgId = msg.id || `msg_${index}`;
+      stats[msgId] = new Set(msg.readBy || []);
+    });
+    return stats;
+  }, [messages]);
 
   // 查詢所有發送者的 Profile（這段保留）
   useEffect(() => {
@@ -136,6 +162,67 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     fetchUserProfiles();
   }, [messages, client]);
 
+  // 批量標記所有未讀訊息為已讀（當最後一個訊息出現時調用）
+  const markAllMessagesAsRead = useCallback(() => {
+    if (!account || !roomId || roomId === "0x0" || hasMarkedAllRead) {
+      return;
+    }
+
+    // 檢查是否有未讀訊息（不是自己發送的）
+    const hasUnreadMessages = messages.some(
+      (msg) => msg.sender !== account.address && !msg.readBy.includes(account.address)
+    );
+
+    if (!hasUnreadMessages) {
+      console.log("沒有未讀訊息，跳過");
+      setHasMarkedAllRead(true);
+      return;
+    }
+
+    console.log("開始批量標記所有未讀訊息為已讀");
+    setHasMarkedAllRead(true);
+
+    const tx = new Transaction();
+    const clock = tx.object("0x6");
+
+    tx.moveCall({
+      target: `${CHAT_CONTRACT_PACKAGE_ID}::chat_contract::mark_all_messages_as_read`,
+      arguments: [
+        tx.object(roomId),
+        clock,
+      ],
+    });
+
+    signAndExecute(
+      {
+        transaction: tx,
+        chain: "sui:testnet",
+      },
+      {
+        onSuccess: () => {
+          console.log("批量標記所有訊息為已讀成功，等待區塊鏈確認...");
+          setTimeout(() => {
+            refetch();
+          }, 1000);
+          setTimeout(() => {
+            refetch();
+          }, 3000);
+        },
+        onError: (error: Error) => {
+          console.error("批量標記訊息已讀失敗:", error);
+          setHasMarkedAllRead(false);
+        },
+      }
+    );
+  }, [account, roomId, messages, hasMarkedAllRead, signAndExecute, refetch]);
+
+  // 單個訊息標記為已讀（用於 IntersectionObserver）
+  const handleMarkAsRead = useCallback((messageId: string) => {
+    // 這裡可以實現單個訊息的標記，但我們主要使用批量標記
+    // 如果需要單個標記，可以在這裡實現
+    console.log("標記訊息為已讀:", messageId);
+  }, []);
+
   // 沒連錢包
   if (!account) {
     return (
@@ -184,9 +271,15 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
         {/* 訊息列表 */}
         <Box style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
           <MessageList
-            messages={messages}
+            messages={messages.map((msg, index) => ({
+              ...msg,
+              id: msg.id || `msg_${index}`,
+            }))}
             currentUser={account.address}
             userProfiles={userProfiles}
+            readStats={readStats}
+            onMarkAsRead={handleMarkAsRead}
+            onLastMessageVisible={markAllMessagesAsRead}
           />
         </Box>
 

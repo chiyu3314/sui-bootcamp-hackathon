@@ -1,5 +1,5 @@
 [package]
-name = "ChatApp"
+name = "chat_contract"
 version = "0.0.1"
 edition = "2024.beta" # <--- 關鍵！加入這一行來啟用新語法
 
@@ -7,4 +7,4 @@ edition = "2024.beta" # <--- 關鍵！加入這一行來啟用新語法
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 
 [addresses]
-chat_app = "0x0"
+chat_contract = "0x0"

@@ -1,4 +1,4 @@
-module chat_app::chat_contract {
+module chat_contract::chat_contract {
     use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
@@ -6,6 +6,9 @@ module chat_app::chat_contract {
     use std::vector;
     use sui::event;
     use sui::clock::{Self, Clock};
+
+    // Constants
+    const E_NOT_OWNER: u64 = 1;
 
     // ========== Structs ==========
 
@@ -24,7 +27,8 @@ module chat_app::chat_contract {
     public struct Message has store, copy, drop {
         sender: address,
         text: String,
-        timestamp: u64
+        timestamp: u64,
+        read_by: vector<address>
     }
 
     public struct MessagePosted has copy, drop {
@@ -37,6 +41,12 @@ module chat_app::chat_contract {
         owner: address,
         username: String,
         avatar_url: String
+    }
+
+    public struct MessageRead has copy, drop {
+        message_index: u64,
+        reader: address,
+        timestamp: u64
     }
 
     // ========== Functions ==========
@@ -77,8 +87,13 @@ module chat_app::chat_contract {
         profile: &mut Profile,
         new_username: String,
         new_avatar_url: String,
-        _ctx: &mut TxContext
+        ctx: &mut TxContext
     ) {
+        let sender = tx_context::sender(ctx);
+
+        // 確保只有 profile 擁有者可以更改
+        assert!(sender == profile.owner, E_NOT_OWNER);
+
         profile.username = new_username;
         profile.avatar_url = new_avatar_url;
 
@@ -90,6 +105,7 @@ module chat_app::chat_contract {
     }
 
     // 注意：這裡移除了 'entry' 關鍵字
+    // 發送訊息（已移除自動標記邏輯以降低 gas 成本）
     public fun send_message(
         room: &mut ChatRoom, 
         text: String, 
@@ -102,7 +118,8 @@ module chat_app::chat_contract {
         let msg = Message {
             sender: sender,
             text: text,
-            timestamp: timestamp
+            timestamp: timestamp,
+            read_by: vector::empty()
         };
 
         vector::push_back(&mut room.messages, msg);
@@ -112,5 +129,65 @@ module chat_app::chat_contract {
             text: text,
             timestamp: timestamp
         });
+    }
+
+    // 標記訊息為已讀
+    public fun mark_message_as_read(
+        room: &mut ChatRoom,
+        message_index: u64,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let reader = tx_context::sender(ctx);
+        let messages_len = vector::length(&room.messages);
+        
+        // 檢查訊息索引是否有效
+        assert!(message_index < messages_len, 0);
+        
+        // 獲取訊息的可變引用
+        let msg = vector::borrow_mut(&mut room.messages, message_index);
+        
+        // 檢查使用者是否已經標記過
+        let already_read = vector::contains(&msg.read_by, &reader);
+        
+        if (!already_read) {
+            // 將讀者地址加入到已讀列表
+            vector::push_back(&mut msg.read_by, reader);
+            
+            // 發送已讀事件
+            event::emit(MessageRead {
+                message_index: message_index,
+                reader: reader,
+                timestamp: clock::timestamp_ms(clock)
+            });
+        }
+    }
+
+    // 批量標記所有未讀訊息為已讀（當用戶看到最後一個訊息時調用）
+    public fun mark_all_messages_as_read(
+        room: &mut ChatRoom,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let reader = tx_context::sender(ctx);
+        let messages_len = vector::length(&room.messages);
+        let timestamp = clock::timestamp_ms(clock);
+        let mut i = 0;
+        
+        while (i < messages_len) {
+            let msg = vector::borrow_mut(&mut room.messages, i);
+            // 檢查使用者是否已經標記過，且不是自己發送的訊息
+            let already_read = vector::contains(&msg.read_by, &reader);
+            if (!already_read && msg.sender != reader) {
+                vector::push_back(&mut msg.read_by, reader);
+                // 發送已讀事件
+                event::emit(MessageRead {
+                    message_index: i,
+                    reader: reader,
+                    timestamp: timestamp
+                });
+            };
+            i = i + 1;
+        };
     }
 }

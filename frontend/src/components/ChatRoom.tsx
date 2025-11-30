@@ -1,15 +1,20 @@
-import { useCurrentAccount, useSuiClientQuery, useSuiClient } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClientQuery, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Box, Container, Flex, Heading, Text, Card } from "@radix-ui/themes";
 import { MessageList } from "./MessageList";
 import { SendMessage } from "./SendMessage";
 import { UserProfile } from "./UserProfile";
-import { CHAT_CONTRACT_PACKAGE_ID } from "../config"; // 只剩這個用 env
-import { useEffect, useState } from "react";
+import { CHAT_CONTRACT_PACKAGE_ID } from "../config";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Transaction } from "@mysten/sui/transactions";
+import { useSubscribeToEvents } from "../hooks/useSubscribeToEvents";
+import { useZKLogin } from "react-sui-zk-login-kit";
 
 interface Message {
   sender: string;
   text: string;
   timestamp: number;
+  readBy: string[];
+  id?: string;
 }
 
 interface UserProfileMap {
@@ -19,20 +24,27 @@ interface UserProfileMap {
   };
 }
 
-// ⭐ 新增：ChatRoom 的 props 型別
 interface ChatRoomProps {
-  roomId: string;     // Sui 上這個聊天室的 object ID
-  roomName: string;   // 顯示用名稱
+  roomId: string;
+  roomName: string;
 }
 
-// ⭐ 改：讓 ChatRoom 接 props
 export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
-  const account = useCurrentAccount();
+  // ✅ 取得錢包帳號
+  const walletAccount = useCurrentAccount();
+  
+  // ✅ 取得 Google zkLogin 帳號
+  const { address: zkAddress } = useZKLogin();
+  
+  // ✅ 優先使用 zkLogin 地址，其次使用錢包地址
+  const account = walletAccount || (zkAddress ? { address: zkAddress } : null);
+  
   const client = useSuiClient();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const [messages, setMessages] = useState<Message[]>([]);
   const [userProfiles, setUserProfiles] = useState<UserProfileMap>({});
+  const [hasMarkedAllRead, setHasMarkedAllRead] = useState(false);
 
-  // 讀取指定 roomId 的 ChatRoom 對象（⭐這裡改 id）
   const { data: chatRoomData, refetch } = useSuiClientQuery(
     "getObject",
     {
@@ -44,20 +56,34 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     },
     {
       enabled: !!roomId && roomId !== "0x0",
-      refetchInterval: 3000,
     }
   );
+
+  useSubscribeToEvents({
+    client,
+    onEvent: useCallback(() => {
+      console.log("收到區塊鏈事件，重新獲取數據");
+      refetch();
+    }, [refetch]),
+    enabled: !!roomId && roomId !== "0x0",
+  });
 
   useEffect(() => {
     if (chatRoomData?.data?.content && "fields" in chatRoomData.data.content) {
       const fields = chatRoomData.data.content.fields as any;
       if (fields.messages && Array.isArray(fields.messages)) {
-        const parsedMessages: Message[] = fields.messages.map((msg: any) => ({
-          sender: msg.fields?.sender || msg.sender || "",
-          text: msg.fields?.text || msg.text || "",
-          timestamp: Number(msg.fields?.timestamp || msg.timestamp || 0),
-        }));
+        const parsedMessages: Message[] = fields.messages.map((msg: any, index: number) => {
+          const readBy = msg.fields?.read_by || msg.read_by || [];
+          return {
+            sender: msg.fields?.sender || msg.sender || "",
+            text: msg.fields?.text || msg.text || "",
+            timestamp: Number(msg.fields?.timestamp || msg.timestamp || 0),
+            readBy: readBy,
+            id: `msg_${index}`,
+          };
+        });
         setMessages(parsedMessages);
+        setHasMarkedAllRead(false);
       } else {
         setMessages([]);
       }
@@ -66,7 +92,15 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     }
   }, [chatRoomData]);
 
-  // 查詢所有發送者的 Profile（這段保留）
+  const readStats = useMemo(() => {
+    const stats: { [messageId: string]: Set<string> } = {};
+    messages.forEach((msg, index) => {
+      const msgId = msg.id || `msg_${index}`;
+      stats[msgId] = new Set(msg.readBy || []);
+    });
+    return stats;
+  }, [messages]);
+
   useEffect(() => {
     const fetchUserProfiles = async () => {
       if (!messages.length || CHAT_CONTRACT_PACKAGE_ID === "0x0") {
@@ -129,18 +163,73 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     fetchUserProfiles();
   }, [messages, client]);
 
-  // 沒連錢包
+  const markAllMessagesAsRead = useCallback(() => {
+    if (!account || !roomId || roomId === "0x0" || hasMarkedAllRead) {
+      return;
+    }
+
+    const hasUnreadMessages = messages.some(
+      (msg) => msg.sender !== account.address && !msg.readBy.includes(account.address)
+    );
+
+    if (!hasUnreadMessages) {
+      console.log("沒有未讀訊息，跳過");
+      setHasMarkedAllRead(true);
+      return;
+    }
+
+    console.log("開始批量標記所有未讀訊息為已讀");
+    setHasMarkedAllRead(true);
+
+    const tx = new Transaction();
+    const clock = tx.object("0x6");
+
+    tx.moveCall({
+      target: `${CHAT_CONTRACT_PACKAGE_ID}::chat_contract::mark_all_messages_as_read`,
+      arguments: [
+        tx.object(roomId),
+        clock,
+      ],
+    });
+
+    signAndExecute(
+      {
+        transaction: tx,
+        chain: "sui:testnet",
+      },
+      {
+        onSuccess: () => {
+          console.log("批量標記所有訊息為已讀成功，等待區塊鏈確認...");
+          setTimeout(() => {
+            refetch();
+          }, 1000);
+          setTimeout(() => {
+            refetch();
+          }, 3000);
+        },
+        onError: (error: Error) => {
+          console.error("批量標記訊息已讀失敗:", error);
+          setHasMarkedAllRead(false);
+        },
+      }
+    );
+  }, [account, roomId, messages, hasMarkedAllRead, signAndExecute, refetch]);
+
+  const handleMarkAsRead = useCallback((messageId: string) => {
+    console.log("標記訊息為已讀:", messageId);
+  }, []);
+
+  // ✅ 檢查是否已登入（Google zkLogin 或錢包）
   if (!account) {
     return (
       <Container>
         <Card style={{ padding: "1rem" }}>
-          <Text>請先連接錢包以使用聊天室</Text>
+          <Text>請先連接錢包或使用 Google 登入以使用聊天室</Text>
         </Card>
       </Container>
     );
   }
 
-  // ⭐ roomId 為空或 0x0 的狀況
   if (!roomId || roomId === "0x0") {
     return (
       <Container size="1" p="1" style={{ maxWidth: "600px", margin: "0 auto" }}>
@@ -153,7 +242,6 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
       </Container>
     );
   }
-
 
   console.log(messages, account);
 
@@ -168,22 +256,25 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
           minHeight: "500px",
         }}
       >
-        {/* ⭐ 標題用 roomName */}
         <Flex justify="between" align="center" style={{ flexShrink: 0 }}>
           <Heading size="6">{roomName}</Heading>
           <UserProfile onProfileUpdate={() => refetch()} />
         </Flex>
 
-        {/* 訊息列表 */}
         <Box style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
           <MessageList
-            messages={messages}
+            messages={messages.map((msg, index) => ({
+              ...msg,
+              id: msg.id || `msg_${index}`,
+            }))}
             currentUser={account.address}
             userProfiles={userProfiles}
+            readStats={readStats}
+            onMarkAsRead={handleMarkAsRead}
+            onLastMessageVisible={markAllMessagesAsRead}
           />
         </Box>
 
-        {/* 發送訊息 */}
         <Box style={{ flexShrink: 0 }}>
           <SendMessage
             onMessageSent={() => {

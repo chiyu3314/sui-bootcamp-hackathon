@@ -1,4 +1,4 @@
-module chat_app::chat_contract {
+module chat_contract::chat_contract {
     use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
@@ -6,6 +6,9 @@ module chat_app::chat_contract {
     use std::vector;
     use sui::event;
     use sui::clock::{Self, Clock};
+
+    // Constants
+    const E_NOT_OWNER: u64 = 1;
 
     // ========== Structs ==========
 
@@ -84,8 +87,13 @@ module chat_app::chat_contract {
         profile: &mut Profile,
         new_username: String,
         new_avatar_url: String,
-        _ctx: &mut TxContext
+        ctx: &mut TxContext
     ) {
+        let sender = tx_context::sender(ctx);
+
+        // 使用自定義錯誤碼，而不是魔法數字
+        assert!(sender == profile.owner, E_NOT_OWNER);
+
         profile.username = new_username;
         profile.avatar_url = new_avatar_url;
 

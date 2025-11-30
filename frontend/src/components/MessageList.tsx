@@ -119,7 +119,7 @@ export function MessageList({
     >
       {messages.length === 0 ? (
         <Flex justify="center" align="center" style={{ height: "100%" }}>
-          <Text color="gray">還沒有訊息，開始聊天吧！</Text>
+          <Text color="gray">Need Donate 100 USDC to start chatting!</Text>
         </Flex>
       ) : (
         <Flex direction="column" gap="3">

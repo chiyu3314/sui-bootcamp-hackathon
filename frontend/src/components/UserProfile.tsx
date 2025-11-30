@@ -121,24 +121,24 @@ export function UserProfile({ onProfileUpdate }: UserProfileProps) {
               <Text>{username}</Text>
             </Flex>
           ) : (
-            "設置資料"
+            "Settings"
           )}
         </Button>
       </Dialog.Trigger>
 
       <Dialog.Content style={{ maxWidth: 450 }}>
-        <Dialog.Title>用戶資料</Dialog.Title>
+        <Dialog.Title>User Profile</Dialog.Title>
         <Dialog.Description size="2" mb="4">
-          設置您的用戶名稱和頭像
+          Set your username and avatar
         </Dialog.Description>
 
         <Flex direction="column" gap="3">
           <label>
             <Text as="div" size="2" mb="1" weight="bold">
-              用戶名稱
+              Username
             </Text>
             <TextField.Root
-              placeholder="輸入用戶名稱"
+              placeholder="Enter username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -146,7 +146,7 @@ export function UserProfile({ onProfileUpdate }: UserProfileProps) {
 
           <label>
             <Text as="div" size="2" mb="1" weight="bold">
-              頭像 URL (選填)
+              Avatar URL (optional)
             </Text>
             <TextField.Root
               placeholder="https://..."
@@ -158,14 +158,14 @@ export function UserProfile({ onProfileUpdate }: UserProfileProps) {
           <Flex gap="3" mt="4" justify="end">
             <Dialog.Close>
               <Button variant="soft" color="gray">
-                取消
+                Cancel
               </Button>
             </Dialog.Close>
             <Button
               onClick={handleCreateOrUpdate}
               disabled={isPending || !username.trim()}
             >
-              {isPending ? "處理中..." : profileId ? "更新" : "創建"}
+              {isPending ? "Processing..." : profileId ? "Update" : "Create"}
             </Button>
           </Flex>
         </Flex>

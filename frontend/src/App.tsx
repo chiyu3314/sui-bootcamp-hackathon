@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
-import { Box, Flex, Heading, Text, Separator, Dialog, Button } from "@radix-ui/themes";
+import { Box, Flex, Heading, Text, Separator, Dialog, Button, Tooltip } from "@radix-ui/themes";
 import { ChatRoom } from "./components/ChatRoom";
 import { CHAT_ROOM_OBJECT_ID } from "./config";
 
@@ -29,15 +29,15 @@ function ChatApp() {
   const [rooms] = useState<Room[]>([
     {
       id: CHAT_ROOM_OBJECT_ID,
-      name: "一般聊天室",
+      name: "General Chat Room",
     },
     {
       id: "room-2",
-      name: "技術討論",
+      name: "Technical Discussion",
     },
     {
       id: "room-3",
-      name: "閒聊區",
+      name: "General Chat Room",
     },
   ]);
 
@@ -86,7 +86,7 @@ function ChatApp() {
   // ✅ 連接錢包時顯示問候訊息
   useEffect(() => {
     if (currentAddress) {
-      const loginMethod = zkAddress ? "Google" : "錢包";
+      const loginMethod = zkAddress ? "Google" : "Wallet";
       const shortAddress = `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`;
       
       setWelcomeInfo({ method: loginMethod, address: shortAddress });
@@ -107,26 +107,26 @@ function ChatApp() {
           <Dialog.Title>
             <Flex align="center" gap="2">
               <Text size="6">🎉</Text>
-              <Text>歡迎回來！</Text>
+              <Text>Welcome back!</Text>
             </Flex>
           </Dialog.Title>
           <Dialog.Description size="2" mb="4">
-            您已成功連接到Chat on Chain
+            You have successfully connected to Chat on Chain
           </Dialog.Description>
 
           <Flex direction="column" gap="3">
             <Box>
               <Text as="div" size="2" weight="bold" mb="1">
-                登入方式
+                Login Method
               </Text>
               <Text as="div" size="2" color="gray">
-                {welcomeInfo.method === "Google" ? "🔐 Google 帳號" : "👛 錢包連接"}
+                {welcomeInfo.method === "Google" ? "🔐 Google Account" : "👛 Wallet Connected"}
               </Text>
             </Box>
 
             <Box>
               <Text as="div" size="2" weight="bold" mb="1">
-                您的地址
+                Your Sui Address
               </Text>
               <Text 
                 as="div" 
@@ -151,7 +151,7 @@ function ChatApp() {
               }}
             >
               <Text size="2">
-                💡 您現在可以開始與其他用戶聊天了！
+                💡 You can now start chatting with other users!
               </Text>
             </Box>
           </Flex>
@@ -159,7 +159,7 @@ function ChatApp() {
           <Flex gap="3" mt="4" justify="end">
             <Dialog.Close>
               <Button size="3" variant="solid">
-                開始使用
+                Start Using
               </Button>
             </Dialog.Close>
           </Flex>
@@ -191,46 +191,56 @@ function ChatApp() {
           }}
         >
           {/* Google zkLogin 按鈕 */}
-          <ZKLogin
-            providers={providers}
-            proverProvider={SUI_PROVER_ENDPOINT}
-            title={zkAddress ? "切換 Google 帳號" : "Google 登入"}
-            subTitle="使用 Google 帳號產生 Sui zkLogin address"
-          />
+          <Tooltip content="Use Google account to generate Sui zkLogin address">
+            <Box style={{ 
+              minHeight: "36px",
+              minWidth: "200px",
+              display: "flex", 
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              <ZKLogin
+                providers={providers}
+                proverProvider={SUI_PROVER_ENDPOINT}
+                title={zkAddress ? "切換 Google account" : "Google Login"}
+              />
+            </Box>
+ 
+          </Tooltip>
 
           {/* 錢包連接按鈕 */}
           <ConnectButton />
 
-          {/* ✅ 顯示目前登入狀態 */}
+          {/* 顯示目前登入狀態 */}
           {currentAddress && (
             <Text size="2" color="gray">
-              {zkAddress ? "✓ Google 登入" : "✓ 錢包已連接"}
+              {zkAddress ? "✓ Google Login" : "✓ Wallet Connected"}
             </Text>
           )}
         </Box>
       </Flex>
 
-      {/* ✅ 檢查是否登入 */}
+      {/* 檢查是否登入 */}
       {!isLoggedIn ? (
         <Flex
           justify="center"
           align="center"
           style={{
-            height: "calc(100vh - 56px)",
+            height: "min(100vh - 56px - 56px, 500px)",
             background: "var(--gray-2)",
           }}
         >
           <Box style={{ textAlign: "center" }}>
             <Heading size="5" mb="3">
-              請登入以使用聊天室
+              Please login to use the chat room
             </Heading>
             <Text color="gray">
-              點擊右上角「Google 登入」或「Connect」按鈕連接你的帳戶
+              Click the "Google Login" or "Connect" button in the top right corner to connect your account
             </Text>
           </Box>
         </Flex>
       ) : (
-        <Flex style={{ height: "calc(100vh - 56px)" }}>
+        <Flex style={{ height: "min(100vh - 56px - 56px, 500px)" }}>
           {/* 左側：聊天室列表 */}
           <Box
             style={{
@@ -249,7 +259,7 @@ function ChatApp() {
                   fontSize: "23px",
                 }}
               >
-                聊天室列表
+                Chat Room List
               </Text>
             </Box>
 
@@ -315,7 +325,7 @@ function ChatApp() {
   );
 }
 
-// ✅ 保留 ZKLoginProvider
+//  保留 ZKLoginProvider
 export default function App() {
   return (
     <ZKLoginProvider client={suiClient}>

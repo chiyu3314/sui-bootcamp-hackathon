@@ -251,8 +251,8 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
         direction="column"
         gap="1"
         style={{
-          height: "calc(100vh - 80px)",
-          maxHeight: "600px",
+          height: "calc(100vh - 56px)",
+          maxHeight: "100%",
           minHeight: "500px",
         }}
       >

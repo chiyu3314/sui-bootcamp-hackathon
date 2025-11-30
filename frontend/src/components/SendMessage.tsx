@@ -20,10 +20,8 @@ export function SendMessage({ onMessageSent }: SendMessageProps) {
 
     const tx = new Transaction();
     
-    // 獲取 Clock 對象
     const clock = tx.object("0x6");
     
-    // 調用 send_message 函數
     tx.moveCall({
       target: `${import.meta.env.VITE_CHAT_PACKAGE_ID}::chat_contract::send_message`,
       arguments: [
@@ -44,8 +42,8 @@ export function SendMessage({ onMessageSent }: SendMessageProps) {
           onMessageSent();
         },
         onError: (error: Error) => {
-          console.error("發送訊息失敗:", error);
-          alert("發送訊息失敗: " + error.message);
+          console.error("Send message failed:", error);
+          alert("Send message failed: " + error.message);
         },
       }
     );
@@ -62,7 +60,7 @@ export function SendMessage({ onMessageSent }: SendMessageProps) {
     <Box>
       <Flex gap="2" align="center">
         <TextField.Root
-          placeholder="輸入訊息..."
+          placeholder="Enter message..."
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
@@ -77,7 +75,7 @@ export function SendMessage({ onMessageSent }: SendMessageProps) {
           onClick={handleSend}
           disabled={isPending || !message.trim() || !account}
         >
-          {isPending ? "發送中..." : "發送"}
+          {isPending ? "Sending..." : "Send"}
         </Button>
       </Flex>
     </Box>

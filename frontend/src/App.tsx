@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
-import { Box, Flex, Heading, Text, Separator } from "@radix-ui/themes";
+import { Box, Flex, Heading, Text, Separator, Dialog, Button } from "@radix-ui/themes";
 import { ChatRoom } from "./components/ChatRoom";
 import { CHAT_ROOM_OBJECT_ID } from "./config";
 
@@ -43,6 +43,10 @@ function ChatApp() {
 
   const [activeRoomId, setActiveRoomId] = useState<string>(rooms[0].id);
   const activeRoom = rooms.find((r) => r.id === activeRoomId) ?? rooms[0];
+  
+  // ✅ 控制問候彈窗
+  const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
+  const [welcomeInfo, setWelcomeInfo] = useState({ method: "", address: "" });
 
   // ✅ 從 dApp Kit 抓錢包帳號
   const currentWalletAccount = useCurrentAccount();
@@ -79,6 +83,17 @@ function ChatApp() {
   // ✅ 檢查是否已登入（Google zkLogin 或錢包連接）
   const isLoggedIn = !!currentAddress;
 
+  // ✅ 連接錢包時顯示問候訊息
+  useEffect(() => {
+    if (currentAddress) {
+      const loginMethod = zkAddress ? "Google" : "錢包";
+      const shortAddress = `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`;
+      
+      setWelcomeInfo({ method: loginMethod, address: shortAddress });
+      setShowWelcomeDialog(true);
+    }
+  }, [currentAddress, zkAddress]);
+
   return (
     <div
       style={{
@@ -86,6 +101,71 @@ function ChatApp() {
         backdropFilter: "blur(10px)",
       }}
     >
+      {/* 問候彈窗 */}
+      <Dialog.Root open={showWelcomeDialog} onOpenChange={setShowWelcomeDialog}>
+        <Dialog.Content style={{ maxWidth: 450 }}>
+          <Dialog.Title>
+            <Flex align="center" gap="2">
+              <Text size="6">🎉</Text>
+              <Text>歡迎回來！</Text>
+            </Flex>
+          </Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            您已成功連接到Chat on Chain
+          </Dialog.Description>
+
+          <Flex direction="column" gap="3">
+            <Box>
+              <Text as="div" size="2" weight="bold" mb="1">
+                登入方式
+              </Text>
+              <Text as="div" size="2" color="gray">
+                {welcomeInfo.method === "Google" ? "🔐 Google 帳號" : "👛 錢包連接"}
+              </Text>
+            </Box>
+
+            <Box>
+              <Text as="div" size="2" weight="bold" mb="1">
+                您的地址
+              </Text>
+              <Text 
+                as="div" 
+                size="2" 
+                style={{ 
+                  fontFamily: "monospace",
+                  background: "var(--gray-3)",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                }}
+              >
+                {welcomeInfo.address}
+              </Text>
+            </Box>
+
+            <Box
+              style={{
+                background: "var(--blue-3)",
+                padding: "12px",
+                borderRadius: "8px",
+                borderLeft: "3px solid var(--blue-9)",
+              }}
+            >
+              <Text size="2">
+                💡 您現在可以開始與其他用戶聊天了！
+              </Text>
+            </Box>
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            <Dialog.Close>
+              <Button size="3" variant="solid">
+                開始使用
+              </Button>
+            </Dialog.Close>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
       {/* 上方 navbar */}
       <Flex
         position="sticky"
@@ -100,7 +180,7 @@ function ChatApp() {
         }}
       >
         <Box>
-          <Heading>聊天室 dApp</Heading>
+          <Heading>Chat on Chain</Heading>
         </Box>
 
         <Box
@@ -150,7 +230,6 @@ function ChatApp() {
           </Box>
         </Flex>
       ) : (
-        /* ✅ 已登入：顯示聊天室列表 + 聊天窗口 */
         <Flex style={{ height: "calc(100vh - 56px)" }}>
           {/* 左側：聊天室列表 */}
           <Box

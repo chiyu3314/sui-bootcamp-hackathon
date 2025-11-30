@@ -224,7 +224,7 @@ export function ChatRoom({ roomId, roomName }: ChatRoomProps) {
     return (
       <Container>
         <Card style={{ padding: "1rem" }}>
-          <Text>請先連接錢包或使用 Google 登入以使用聊天室</Text>
+          <Text>這個聊天室目前還沒開放，請贊助100USDC開啟。</Text>
         </Card>
       </Container>
     );
